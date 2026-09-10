@@ -132,9 +132,7 @@ def find_gm(eps: float, sigma: float, dump: Path) -> dict:
 
 def write_min_line(path: Path, energy: float, coords: np.ndarray) -> None:
     flat = np.asarray(coords, dtype=float).reshape(-1)
-    path.write_text(
-        f"{energy:.8f} " + " ".join(f"{v:.6f}" for v in flat) + "\n"
-    )
+    path.write_text(f"{energy:.8f} " + " ".join(f"{v:.6f}" for v in flat) + "\n")
 
 
 def main() -> int:
