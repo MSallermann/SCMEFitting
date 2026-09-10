@@ -79,9 +79,7 @@ def test_fit_anneal_keeps_best_ask(monkeypatch: pytest.MonkeyPatch):
             self.success = True
             self.message = "fake"
 
-    def fake_minimize(
-        fun: object, *_args: object, **_kwargs: object
-    ) -> FakeResult:
+    def fake_minimize(fun: object, *_args: object, **_kwargs: object) -> FakeResult:
         assert callable(fun)
         fun(np.array([1.0]))
         return FakeResult()
