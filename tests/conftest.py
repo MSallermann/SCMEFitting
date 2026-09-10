@@ -61,6 +61,22 @@ def e_lj_pairs(positions: np.ndarray, eps: float, sigma: float) -> float:
     return energy
 
 
+def e_lj_pairs_grad(
+    positions: np.ndarray, eps: float, sigma: float
+) -> tuple[float, float]:
+    """(dE/deps, dE/dsigma) for all pairs."""
+    pos = np.asarray(positions, dtype=float).reshape(-1, 3)
+    d_eps = 0.0
+    d_sigma = 0.0
+    for i in range(len(pos)):
+        for j in range(i + 1, len(pos)):
+            r = float(np.linalg.norm(pos[i] - pos[j]))
+            sr = sigma / r
+            d_eps += 4.0 * (sr**12 - sr**6)
+            d_sigma += 4.0 * eps / r * (12.0 * sr**11 - 6.0 * sr**5)
+    return d_eps, d_sigma
+
+
 def construct_lj(atoms: Atoms):
     atoms.calc = LennardJones(rc=2000)
 

@@ -5,7 +5,7 @@ import math
 import time
 from concurrent.futures import ThreadPoolExecutor
 from numbers import Real
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, cast
 
 import nevergrad as ng
 import numpy as np
@@ -29,6 +29,22 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
+
+
+def _forward_diff_jac(
+    fun: Callable[[npt.NDArray], float],
+    x: npt.NDArray,
+    step: float = 1e-6,
+) -> npt.NDArray:
+    """One-sided finite difference of a scalar box objective."""
+    x0 = np.asarray(x, dtype=float).reshape(-1)
+    grad = np.empty(x0.size, dtype=float)
+    f0 = float(fun(x0))
+    for i in range(x0.size):
+        bumped = x0.copy()
+        bumped[i] += step
+        grad[i] = (float(fun(bumped)) - f0) / step
+    return grad
 
 
 class FitterEvaluateContext(EvaluateContext):
@@ -659,7 +675,7 @@ class Fitter:
         store: str | None = None,
         seed: int = 0,
         history: str = "shared",
-        jac: Callable[[npt.NDArray], npt.NDArray] | None = None,
+        jac: Callable[[npt.NDArray], npt.NDArray] | Literal[False] | None = None,
         ctx: FitterEvaluateContext | None = None,
     ) -> dict[str, Any]:
         """
@@ -675,13 +691,15 @@ class Fitter:
 
         Args:
             budget: Combined objective and gradient work units.
-            replicas: Communicating hop chains. Ignored on the values-only
-                portfolio path (no ``jac``).
+            replicas: Communicating hop chains. Used when a gradient is
+                available (the default).
             store: Parameter archive handle. See ``anneal.open_parameter_store``.
             seed: RNG seed forwarded to anneal.
             history: ``shared``, ``private``, or ``none``.
-            jac: Optional gradient of the flattened vector. With it, anneal
-                hops and quenches; without it, the portfolio runs.
+            jac: Gradient of the flattened vector. ``None`` builds a
+                one-sided finite difference so the hop path runs.
+                ``False`` skips the gradient and uses the values-only
+                portfolio (``replicas`` is then ignored).
             ctx: Optional fitter evaluation context.
 
         Returns:
@@ -731,11 +749,20 @@ class Fitter:
             assert isinstance(loss, float)
             return loss
 
+        if jac is False:
+            hop_jac = None
+        elif jac is None:
+
+            def hop_jac(x: npt.NDArray) -> npt.NDArray:
+                return _forward_diff_jac(f_anneal, x)
+        else:
+            hop_jac = jac
+
         res = anneal_minimize(
             f_anneal,
             x0,
             bounds=bounds,
-            jac=jac,
+            jac=hop_jac,
             budget=budget,
             seed=seed,
             replicas=replicas,

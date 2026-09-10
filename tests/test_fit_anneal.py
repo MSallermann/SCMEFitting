@@ -14,6 +14,7 @@ from conftest import (
     construct_lj,
     e_lj,
     e_lj_pairs,
+    e_lj_pairs_grad,
 )
 
 from chemfit.abstract_objective_function import (
@@ -103,6 +104,7 @@ def test_fit_anneal_lj_dimers(tmp_path: Path):
         store=str(store),
         seed=3,
         history="shared",
+        jac=False,
     )
     assert store.is_file()
     assert opt["epsilon"] == pytest.approx(eps, rel=0.25, abs=0.25)
@@ -113,7 +115,21 @@ def test_fit_anneal_lj13_icosahedron(tmp_path: Path):
     eps, sigma = 1.0, 1.0
     r_min = 2.0 ** (1.0 / 6.0) * sigma
     r_list = np.linspace(0.95 * r_min, 2.0 * sigma, 8)
+    factories = [LJ13IcoFactory(float(r)) for r in r_list]
+    e_refs = [e_lj_pairs(f.positions, eps, sigma) for f in factories]
     ob = CombinedObjectiveFunction([lj13_term(float(r), eps, sigma) for r in r_list])
+
+    def jac(x: np.ndarray):
+        e, s = float(x[0]), float(x[1])
+        g = np.zeros(2)
+        for factory, e_ref in zip(factories, e_refs):
+            energy = e_lj_pairs(factory.positions, e, s)
+            d_eps, d_sigma = e_lj_pairs_grad(factory.positions, e, s)
+            resid = energy - e_ref
+            g[0] += 2.0 * resid * d_eps
+            g[1] += 2.0 * resid * d_sigma
+        return g
+
     fitter = Fitter(
         ob,
         initial_params={"epsilon": 2.0, "sigma": 1.5},
@@ -127,9 +143,10 @@ def test_fit_anneal_lj13_icosahedron(tmp_path: Path):
         store=str(store),
         seed=3,
         history="shared",
+        jac=jac,
     )
     end_loss = float(ob(opt))
     assert store.is_file()
     assert end_loss < start_loss
-    assert opt["epsilon"] == pytest.approx(eps, rel=0.25, abs=0.25)
-    assert opt["sigma"] == pytest.approx(sigma, rel=0.25, abs=0.25)
+    assert opt["epsilon"] == pytest.approx(eps, rel=1e-8, abs=1e-8)
+    assert opt["sigma"] == pytest.approx(sigma, rel=1e-8, abs=1e-8)

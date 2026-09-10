@@ -16,7 +16,13 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
-from conftest import LJ13IcoFactory, apply_params_lj, construct_lj, e_lj_pairs
+from conftest import (
+    LJ13IcoFactory,
+    apply_params_lj,
+    construct_lj,
+    e_lj_pairs,
+    e_lj_pairs_grad,
+)
 
 from chemfit.abstract_objective_function import (
     EvaluateContext,
@@ -74,7 +80,21 @@ def main() -> int:
         return 3
     analytic = e_lj_pairs(factory0.positions, eps0, sigma0)
     print("preflight_energy", quants["energy"], "analytic", analytic)
+    factories = [LJ13IcoFactory(float(r)) for r in r_list]
+    e_refs = [e_lj_pairs(f.positions, eps0, sigma0) for f in factories]
     ob = CombinedObjectiveFunction([lj13_term(float(r), eps0, sigma0) for r in r_list])
+
+    def jac(x: np.ndarray):
+        eps, sigma = float(x[0]), float(x[1])
+        g = np.zeros(2)
+        for factory, e_ref in zip(factories, e_refs):
+            energy = e_lj_pairs(factory.positions, eps, sigma)
+            d_eps, d_sigma = e_lj_pairs_grad(factory.positions, eps, sigma)
+            resid = energy - e_ref
+            g[0] += 2.0 * resid * d_eps
+            g[1] += 2.0 * resid * d_sigma
+        return g
+
     start_loss = float(ob(start))
     print("start", start, "start_loss", start_loss)
     campaign = Path("lj13-campaign")
@@ -84,17 +104,23 @@ def main() -> int:
         initial_params=dict(start),
         bounds={"epsilon": (0.2, 4.0), "sigma": (0.2, 4.0)},
     )
+    store = campaign / "params.jsonl"
+    if store.is_file():
+        store.unlink()
     opt = fitter.fit_anneal(
         budget=240,
         replicas=2,
-        store=str(campaign / "params.jsonl"),
+        store=str(store),
         seed=3,
         history="shared",
+        jac=jac,
     )
     end_loss = float(ob(opt))
+    n_evals = fitter.contexts[0].n_evals
+    print("path hop analytic jac replicas 2")
     print("target", {"epsilon": eps0, "sigma": sigma0})
-    print("opt", opt, "end_loss", end_loss)
-    print("store", campaign / "params.jsonl")
+    print("opt", opt, "end_loss", end_loss, "n_evals", n_evals)
+    print("store", store)
     moved = end_loss < start_loss
     recovered = abs(opt["epsilon"] - eps0) < 0.25 and abs(opt["sigma"] - sigma0) < 0.25
     print("LJ13_ANNEAL_OK" if moved and recovered else "LJ13_ANNEAL_MISS")
