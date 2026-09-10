@@ -31,6 +31,11 @@ from chemfit.ase_objective_function import SinglePointASEComputer
 from chemfit.combined_objective_function import CombinedObjectiveFunction
 from chemfit.fitter import Fitter
 
+try:
+    import anneal
+except ImportError:
+    anneal = None
+
 CAMBRIDGE_GM = -44.326801
 
 
@@ -113,8 +118,6 @@ def fit_lj13() -> dict:
 
 
 def find_gm(eps: float, sigma: float, dump: Path) -> dict:
-    import anneal
-
     dump = dump.resolve()
     dump.parent.mkdir(parents=True, exist_ok=True)
     if dump.is_file():
@@ -136,9 +139,7 @@ def write_min_line(path: Path, energy: float, coords: np.ndarray) -> None:
 
 
 def main() -> int:
-    try:
-        import anneal
-    except ImportError:
+    if anneal is None:
         print("anneal is not installed; fit_anneal cannot run", file=sys.stderr)
         return 2
     if not hasattr(anneal, "cluster_search"):

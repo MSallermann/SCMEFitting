@@ -20,6 +20,11 @@ from conftest import LJ13IcoFactory, e_lj
 
 from chemfit.fitter import Fitter
 
+try:
+    import anneal
+except ImportError:
+    anneal = None
+
 CAMBRIDGE_GM = -44.326801
 N_ATOMS = 13
 DIM = 3 * N_ATOMS
@@ -52,7 +57,7 @@ def pair_energy(x: np.ndarray) -> float:
     return float(energy)
 
 
-class _AskDump:
+class _LossLog:
     fh = None
 
 
@@ -64,8 +69,8 @@ def write_min_line(path: Path, energy: float, coords: np.ndarray) -> None:
 def loss(params: dict) -> float:
     x = vec_from_params(params)
     energy = pair_energy(x)
-    if _AskDump.fh is not None:
-        _AskDump.fh.write(f"{energy:.8f} " + " ".join(f"{v:.6f}" for v in x) + "\n")
+    if _LossLog.fh is not None:
+        _LossLog.fh.write(f"{energy:.8f} " + " ".join(f"{v:.6f}" for v in x) + "\n")
     return energy
 
 
@@ -100,9 +105,7 @@ def random_start(seed: int) -> np.ndarray:
 
 
 def main() -> int:
-    try:
-        import anneal  # noqa: F401
-    except ImportError:
+    if anneal is None:
         print("anneal is not installed; fit_anneal cannot run", file=sys.stderr)
         return 2
 
@@ -132,7 +135,7 @@ def main() -> int:
         dump_path = campaign / f"{name}.min"
         print("start", name, start_e, "dump", dump_path)
         with dump_path.open("w", encoding="ascii") as dump_fh:
-            _AskDump.fh = dump_fh
+            _LossLog.fh = dump_fh
             fitter = Fitter(
                 loss,
                 initial_params=params_from_vec(x0),
@@ -145,7 +148,7 @@ def main() -> int:
                 history="shared",
                 jac=jac,
             )
-            _AskDump.fh = None
+            _LossLog.fh = None
         best_x = vec_from_params(opt)
         best = pair_energy(best_x)
         n_evals = int(fitter.contexts[0].n_evals)
