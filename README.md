@@ -26,6 +26,21 @@ git clone git@github.com:MSallermann/chemfit.git
 pip install chemfit
 ```
 
+# Anneal backend
+
+`Fitter.fit_anneal` is the same flatten as `fit_scipy`, then
+[`anneal.minimize`](https://github.com/HaoZeke/anneal). Set `replicas`
+and `store` on that call. `examples/lj13_cartesian_anneal.py` is 39 Cartesian coordinates,
+loss = LJ energy. From the Mackay icosahedron, `fit_anneal` reaches
+Cambridge −44.326801.
+
+![LJ13 39-D fit_anneal](examples/lj13_cartesian.png)
+
+```bash
+pip install chemfit anneal
+python examples/lj13_cartesian_anneal.py
+```
+
 # Citation
 
 If you find ChemFit useful and happen to use it in any academic context, please use this reference to cite it:
