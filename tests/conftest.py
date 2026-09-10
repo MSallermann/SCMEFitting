@@ -18,7 +18,8 @@ class LJAtomsFactory:
 
 
 class LJ13IcoFactory:
-    """Mackay LJ13: centre plus twelve vertices, centre-to-vertex ``r``.
+    """
+    Mackay LJ13: centre plus twelve vertices, centre-to-vertex ``r``.
 
     Same construction as anneal's ``icosahedron13`` (golden-ratio verts,
     scaled so the first shell sits at ``r``). All 78 pairs contribute.
