@@ -691,15 +691,17 @@ class Fitter:
 
         Args:
             budget: Combined objective and gradient work units.
-            replicas: Communicating hop chains. Used when a gradient is
-                available (the default).
+            replicas: Communicating hop chains. One replica and
+                ``jac=False`` is the values-only portfolio. Two or more
+                replicas still hop without a user gradient.
             store: Parameter archive handle. See ``anneal.open_parameter_store``.
             seed: RNG seed forwarded to anneal.
             history: ``shared``, ``private``, or ``none``.
             jac: Gradient of the flattened vector. ``None`` builds a
                 one-sided finite difference so the hop path runs.
-                ``False`` skips the gradient and uses the values-only
-                portfolio (``replicas`` is then ignored).
+                ``False`` skips the user gradient: one replica is the
+                portfolio, two or more are communicating values-only
+                hop chains.
             ctx: Optional fitter evaluation context.
 
         Returns:
