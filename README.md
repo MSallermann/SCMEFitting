@@ -31,7 +31,10 @@ pip install chemfit
 `Fitter.fit_anneal` is the same flatten as `fit_scipy`, then
 [`anneal.minimize`](https://github.com/HaoZeke/anneal). Set `replicas`
 and `store` on that call. `examples/lj13_anneal.py` fits LJ
-`epsilon`/`sigma` on eight scaled Mackay LJ13 icosahedra.
+`epsilon`/`sigma` on eight scaled Mackay LJ13 icosahedra, then
+`anneal.cluster_search` finds the LJ13 GM under that fitted potential.
+
+![LJ13 accepted minima after fit_anneal](examples/lj13_landscape.png)
 
 ```bash
 pip install chemfit anneal

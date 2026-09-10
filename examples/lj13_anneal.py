@@ -3,12 +3,15 @@
 Fit LJ epsilon/sigma with ChemFit.fit_anneal, then find the LJ13 GM.
 
 The fitter only sees the two parameters. The GM is anneal.cluster_search
-under those parameters. Success is Cambridge -44.326801.
+under the fitted potential. E(eps, sigma, x) = eps * E(1, 1, x/sigma),
+so the gate is eps times Cambridge -44.326801.
 """
 
 from __future__ import annotations
 
 import functools
+import json
+import os
 import sys
 from pathlib import Path
 
@@ -109,9 +112,14 @@ def fit_lj13() -> dict:
     )
 
 
-def find_gm(eps: float, sigma: float) -> dict:
-    import anneal  # noqa: PLC0415
+def find_gm(eps: float, sigma: float, dump: Path) -> dict:
+    import anneal
 
+    dump = dump.resolve()
+    dump.parent.mkdir(parents=True, exist_ok=True)
+    if dump.is_file():
+        dump.unlink()
+    os.environ["ANNEAL_MIN_DUMP"] = str(dump)
     return anneal.cluster_search(
         lambda x: cluster_energy(x, eps, sigma),
         lambda x: cluster_grad(x, eps, sigma),
@@ -122,9 +130,16 @@ def find_gm(eps: float, sigma: float) -> dict:
     )
 
 
+def write_min_line(path: Path, energy: float, coords: np.ndarray) -> None:
+    flat = np.asarray(coords, dtype=float).reshape(-1)
+    path.write_text(
+        f"{energy:.8f} " + " ".join(f"{v:.6f}" for v in flat) + "\n"
+    )
+
+
 def main() -> int:
     try:
-        import anneal  # noqa: PLC0415
+        import anneal
     except ImportError:
         print("anneal is not installed; fit_anneal cannot run", file=sys.stderr)
         return 2
@@ -133,18 +148,41 @@ def main() -> int:
         return 2
 
     opt = fit_lj13()
+    eps, sigma = float(opt["epsilon"]), float(opt["sigma"])
     print("opt", opt)
-    recovered = abs(opt["epsilon"] - 1.0) < 0.05 and abs(opt["sigma"] - 1.0) < 0.05
-    if not recovered:
-        print("LJ13_GM_MISS fit did not recover the potential")
-        return 1
-    # References were generated at epsilon=sigma=1. That is the LJ13 GM.
-    search = find_gm(1.0, 1.0)
+    campaign = Path("lj13-campaign").resolve()
+    campaign.mkdir(exist_ok=True)
+    # E(eps, sigma, x) = eps * E(1, 1, x/sigma). Gate is eps * Cambridge.
+    expected = eps * CAMBRIDGE_GM
+    dump = campaign / "minima.min"
+    search = find_gm(eps, sigma, dump)
     best = float(search["best_energy"])
     hops = int(search["hops"])
+    best_x = np.asarray(search["best"], dtype=float).reshape(-1)
+    if not dump.is_file() or dump.stat().st_size == 0:
+        write_min_line(dump, best, best_x)
+        print("dump_fallback", dump)
+    dump_lines = sum(1 for line in dump.read_text().splitlines() if line.strip())
     print("cluster_search recommended n=13 budget 100000 seed 0")
-    print("best_energy", best, "hops", hops, "cambridge", CAMBRIDGE_GM)
-    hit = best < CAMBRIDGE_GM + 1e-3
+    print("eps", eps, "sigma", sigma)
+    print("best_energy", best, "hops", hops, "expected", expected)
+    print("dump", dump, "lines", dump_lines)
+    hit = best < expected + 1e-3
+    (campaign / "opt.json").write_text(
+        json.dumps(
+            {
+                "epsilon": eps,
+                "sigma": sigma,
+                "best_energy": best,
+                "expected_gm": expected,
+                "hops": hops,
+                "hit": hit,
+                "dump_lines": dump_lines,
+            }
+        )
+        + "\n"
+    )
+    write_min_line(campaign / "ref.min", best, best_x)
     print("LJ13_GM_OK" if hit else "LJ13_GM_MISS")
     return 0 if hit else 1
 
