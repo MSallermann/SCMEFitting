@@ -70,6 +70,32 @@ def test_fit_anneal_needs_finite_bounds():
         fitter.fit_anneal(budget=16, replicas=2)
 
 
+def test_fit_anneal_keeps_best_ask(monkeypatch: pytest.MonkeyPatch):
+    class FakeResult:
+        def __init__(self):
+            self.x = np.array([3.0])
+            self.fun = 4.0
+            self.nfev = 2
+            self.success = True
+            self.message = "fake"
+
+    def fake_minimize(
+        fun: object, *_args: object, **_kwargs: object
+    ) -> FakeResult:
+        assert callable(fun)
+        fun(np.array([1.0]))
+        return FakeResult()
+
+    monkeypatch.setattr("anneal.minimize", fake_minimize)
+    fitter = Fitter(
+        lambda p: (p["x"] - 1.0) ** 2,
+        {"x": 2.0},
+        bounds={"x": (0.0, 4.0)},
+    )
+    opt = fitter.fit_anneal(budget=8, replicas=1, jac=False)
+    assert opt["x"] == pytest.approx(1.0)
+
+
 def test_lj13_computer_returns_energy():
     r = 2.0 ** (1.0 / 6.0)
     atoms = LJ13IcoFactory(r)()

@@ -760,7 +760,7 @@ class Fitter:
         else:
             hop_jac = jac
 
-        res = anneal_minimize(
+        anneal_minimize(
             f_anneal,
             x0,
             bounds=bounds,
@@ -772,7 +772,6 @@ class Fitter:
             store=store,
         )
         self.tell(self.contexts[0].n_evals)
-
-        opt_params = dict(zip(self._keys, res.x))
-        opt_params = unflatten_dict(opt_params)
-        return self.finish(opt_params)
+        # minimize returns the last accepted point of the best replica.
+        # Metropolis can walk off a better ask; ChemFit keeps that ask.
+        return self.finish()
