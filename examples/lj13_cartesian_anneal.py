@@ -155,7 +155,9 @@ def main() -> int:
         if hit and gm_x is None:
             gm_x = best_x
             gm_e = best
-        dump_lines = sum(1 for line in dump_path.read_text().splitlines() if line.strip())
+        dump_lines = sum(
+            1 for line in dump_path.read_text().splitlines() if line.strip()
+        )
         print(
             "result",
             name,
