@@ -26,6 +26,7 @@ class LJ13IcoFactory:
     """
 
     def __init__(self, r: float) -> None:
+        """Place twelve vertices at centre-to-vertex distance ``r``."""
         phi = (1.0 + 5.0**0.5) / 2.0
         verts = np.array(
             [

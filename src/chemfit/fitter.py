@@ -690,7 +690,7 @@ class Fitter:
         """
 
         try:
-            from anneal import minimize as anneal_minimize
+            from anneal import minimize as anneal_minimize  # noqa: PLC0415
         except ImportError as exc:
             msg = "fit_anneal requires the anneal package"
             raise ImportError(msg) from exc

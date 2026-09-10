@@ -49,7 +49,7 @@ def lj13_term(r: float, eps: float, sigma: float) -> QuantityComputerObjectiveFu
 
 def main() -> int:
     try:
-        import anneal  # noqa: F401
+        import anneal  # noqa: F401, PLC0415
     except ImportError:
         print("anneal is not installed; fit_anneal cannot run", file=sys.stderr)
         return 2

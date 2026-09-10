@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import functools
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-
-anneal = pytest.importorskip("anneal")
-
 from conftest import (
     LJ13IcoFactory,
     LJAtomsFactory,
@@ -25,6 +23,11 @@ from chemfit.abstract_objective_function import (
 from chemfit.ase_objective_function import SinglePointASEComputer
 from chemfit.combined_objective_function import CombinedObjectiveFunction
 from chemfit.fitter import Fitter
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+pytest.importorskip("anneal")
 
 
 def loss_function(quants: dict, e_ref: float):
@@ -83,7 +86,7 @@ def test_lj13_computer_returns_energy():
     assert quants["energy"] == pytest.approx(analytic, rel=1e-6, abs=1e-6)
 
 
-def test_fit_anneal_lj_dimers(tmp_path):
+def test_fit_anneal_lj_dimers(tmp_path: Path):
     eps, sigma = 1.0, 1.0
     r_min = 2.0 ** (1.0 / 6.0) * sigma
     r_list = np.linspace(0.95 * r_min, 2.0 * sigma, 8)
@@ -106,7 +109,7 @@ def test_fit_anneal_lj_dimers(tmp_path):
     assert opt["sigma"] == pytest.approx(sigma, rel=0.25, abs=0.25)
 
 
-def test_fit_anneal_lj13_icosahedron(tmp_path):
+def test_fit_anneal_lj13_icosahedron(tmp_path: Path):
     eps, sigma = 1.0, 1.0
     r_min = 2.0 ** (1.0 / 6.0) * sigma
     r_list = np.linspace(0.95 * r_min, 2.0 * sigma, 8)
