@@ -32,7 +32,6 @@ pip install chemfit
 [`anneal.minimize`](https://github.com/HaoZeke/anneal). Set `replicas`
 and `store` on that call. `examples/lj13_anneal.py` fits LJ
 `epsilon`/`sigma` on eight scaled Mackay LJ13 icosahedra.
-`examples/lj13_landscape.png` is a landfold of that cluster.
 
 ```bash
 pip install chemfit anneal
