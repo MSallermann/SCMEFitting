@@ -77,7 +77,9 @@ def test_lj4_tetra_computer_returns_energy():
     )
     quants = computer({"epsilon": 1.0, "sigma": 1.0}, EvaluateContext())
     assert "energy" in quants
-    assert quants["energy"] == pytest.approx(e_lj_tetra(r, 1.0, 1.0), rel=1e-6, abs=1e-6)
+    assert quants["energy"] == pytest.approx(
+        e_lj_tetra(r, 1.0, 1.0), rel=1e-6, abs=1e-6
+    )
 
 
 def test_fit_anneal_lj_dimers(tmp_path):

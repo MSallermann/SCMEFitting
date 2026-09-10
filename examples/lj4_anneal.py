@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Fit LJ epsilon/sigma on a 4-atom tetrahedron through ChemFit.fit_anneal.
+"""
+Fit LJ epsilon/sigma on a 4-atom tetrahedron through ChemFit.fit_anneal.
 
 Eight regular tetrahedra (Ar4, edge lengths around the LJ minimum). The
 state is the two parameters, not a 3N geometry. replicas and store are
@@ -68,8 +69,15 @@ def main() -> int:
     if "energy" not in quants:
         print("preflight missing energy", sorted(quants), file=sys.stderr)
         return 3
-    print("preflight_energy", quants["energy"], "analytic", e_lj_tetra(float(r_list[0]), eps0, sigma0))
-    ob = CombinedObjectiveFunction([lj_tetra_term(float(r), eps0, sigma0) for r in r_list])
+    print(
+        "preflight_energy",
+        quants["energy"],
+        "analytic",
+        e_lj_tetra(float(r_list[0]), eps0, sigma0),
+    )
+    ob = CombinedObjectiveFunction(
+        [lj_tetra_term(float(r), eps0, sigma0) for r in r_list]
+    )
     start_loss = float(ob(start))
     print("start", start, "start_loss", start_loss)
     campaign = Path("lj4-campaign")

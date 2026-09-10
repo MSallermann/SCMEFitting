@@ -686,6 +686,7 @@ class Fitter:
 
         Returns:
             Dictionary of optimized parameter values.
+
         """
 
         try:
