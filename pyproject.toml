@@ -22,6 +22,7 @@ Repository = "https://github.com/MSallermann/chemfit"
 build_docs = ["sphinx", "furo", "sphinxcontrib-napoleon", "sphinx-autobuild"]
 mpi = ["mpi4py"]
 test = ["pytest", "loky"]
+anneal = ["anneal"]
 
 [tool.pyright]
 include = ["src/chemfit"]

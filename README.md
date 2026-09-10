@@ -26,6 +26,18 @@ git clone git@github.com:MSallermann/chemfit.git
 pip install chemfit
 ```
 
+# Anneal backend
+
+`Fitter.fit_anneal` is the same flatten as `fit_scipy`, then
+[`anneal.minimize`](https://github.com/HaoZeke/anneal). Set `replicas`
+and `store` on that call. `examples/lj4_anneal.py` fits LJ
+`epsilon`/`sigma` on eight ASE 4-atom tetrahedra.
+
+```bash
+pip install chemfit anneal
+python examples/lj4_anneal.py
+```
+
 # Citation
 
 If you find ChemFit useful and happen to use it in any academic context, please use this reference to cite it:

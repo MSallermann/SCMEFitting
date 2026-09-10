@@ -651,3 +651,98 @@ class Fitter:
         opt_params = unflatten_dict(opt_params)
 
         return self.finish(opt_params)
+
+    def fit_anneal(
+        self,
+        budget: int,
+        replicas: int = 4,
+        store: str | None = None,
+        seed: int = 0,
+        history: str = "shared",
+        jac: Callable[[npt.NDArray], npt.NDArray] | None = None,
+        ctx: FitterEvaluateContext | None = None,
+    ) -> dict[str, Any]:
+        """
+        Optimize parameters using ``anneal.minimize``.
+
+        Same flatten as :meth:`fit_scipy`. The state is a design box, not a
+        point set. ``replicas`` is the communicating hop-chain count.
+        ``store`` is an existing HDF5 file or a campaign directory (parameter
+        rows live beside a readcon-db corpus, never as CON frames).
+
+        Every coordinate needs a finite bound. Missing bounds are an error;
+        do not pass ``(None, None)``.
+
+        Args:
+            budget: Combined objective and gradient work units.
+            replicas: Communicating hop chains. Ignored on the values-only
+                portfolio path (no ``jac``).
+            store: Parameter archive handle. See ``anneal.open_parameter_store``.
+            seed: RNG seed forwarded to anneal.
+            history: ``shared``, ``private``, or ``none``.
+            jac: Optional gradient of the flattened vector. With it, anneal
+                hops and quenches; without it, the portfolio runs.
+            ctx: Optional fitter evaluation context.
+
+        Returns:
+            Dictionary of optimized parameter values.
+        """
+
+        try:
+            from anneal import minimize as anneal_minimize
+        except ImportError as exc:
+            msg = "fit_anneal requires the anneal package"
+            raise ImportError(msg) from exc
+
+        if budget < 1:
+            msg = "budget must be positive"
+            raise ValueError(msg)
+        if replicas < 1:
+            msg = "replicas must be positive"
+            raise ValueError(msg)
+
+        flat_params = flatten_dict(self.initial_parameters)
+        flat_bounds = flatten_dict(self.bounds)
+        self._keys = list(flat_params.keys())
+        x0 = np.array([flat_params[k] for k in self._keys], dtype=float)
+
+        pairs = []
+        for k in self._keys:
+            if k not in flat_bounds:
+                msg = (
+                    f"fit_anneal needs a finite box for {k!r}; "
+                    "ChemFit (None, None) bounds are not a box"
+                )
+                raise ValueError(msg)
+            lo, hi = flat_bounds[k]
+            if lo is None or hi is None:
+                msg = f"fit_anneal needs finite bounds for {k!r}, got {(lo, hi)}"
+                raise ValueError(msg)
+            pairs.append((float(lo), float(hi)))
+        bounds = np.array(pairs, dtype=float)
+
+        self.init(contexts=None if ctx is None else [ctx])
+
+        def f_anneal(x: npt.NDArray) -> float:
+            p = unflatten_dict(dict(zip(self._keys, x)), dict_factory=dict[str, Any])
+            cast("dict[str, Any]", p)
+            loss = self.ask(p)
+            assert isinstance(loss, float)
+            return loss
+
+        res = anneal_minimize(
+            f_anneal,
+            x0,
+            bounds=bounds,
+            jac=jac,
+            budget=budget,
+            seed=seed,
+            replicas=replicas,
+            history=history,
+            store=store,
+        )
+        self.tell(self.contexts[0].n_evals)
+
+        opt_params = dict(zip(self._keys, res.x))
+        opt_params = unflatten_dict(opt_params)
+        return self.finish(opt_params)
