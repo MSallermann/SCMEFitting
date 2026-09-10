@@ -30,15 +30,15 @@ pip install chemfit
 
 `Fitter.fit_anneal` is the same flatten as `fit_scipy`, then
 [`anneal.minimize`](https://github.com/HaoZeke/anneal). Set `replicas`
-and `store` on that call. `examples/lj13_anneal.py` fits LJ
-`epsilon`/`sigma` on eight scaled Mackay LJ13 icosahedra, then
-`anneal.cluster_search` finds the LJ13 GM under that fitted potential.
+and `store` on that call. `examples/lj13_cartesian_anneal.py` is 39 Cartesian coordinates,
+loss = LJ energy. From the Mackay icosahedron, `fit_anneal` reaches
+Cambridge −44.326801.
 
-![LJ13 accepted minima after fit_anneal](examples/lj13_landscape.png)
+![LJ13 39-D fit_anneal](examples/lj13_cartesian.png)
 
 ```bash
 pip install chemfit anneal
-python examples/lj13_anneal.py
+python examples/lj13_cartesian_anneal.py
 ```
 
 # Citation

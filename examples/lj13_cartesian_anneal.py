@@ -52,8 +52,21 @@ def pair_energy(x: np.ndarray) -> float:
     return float(energy)
 
 
+class _AskDump:
+    fh = None
+
+
+def write_min_line(path: Path, energy: float, coords: np.ndarray) -> None:
+    flat = np.asarray(coords, dtype=float).reshape(-1)
+    path.write_text(f"{energy:.8f} " + " ".join(f"{v:.6f}" for v in flat) + "\n")
+
+
 def loss(params: dict) -> float:
-    return pair_energy(vec_from_params(params))
+    x = vec_from_params(params)
+    energy = pair_energy(x)
+    if _AskDump.fh is not None:
+        _AskDump.fh.write(f"{energy:.8f} " + " ".join(f"{v:.6f}" for v in x) + "\n")
+    return energy
 
 
 def jac(x: np.ndarray) -> np.ndarray:
@@ -105,31 +118,44 @@ def main() -> int:
     print("n_params", DIM)
     print("jac0", float(g[0]), "fd0", float(fd0))
 
+    campaign = Path("lj13-cartesian").resolve()
+    campaign.mkdir(exist_ok=True)
     rows = []
     hit_any = False
+    gm_x = None
+    gm_e = None
     for name, x0, budget in (
         ("ico", ico, 20_000),
         ("random", random_x, 20_000),
     ):
         start_e = pair_energy(x0)
-        print("start", name, start_e)
-        fitter = Fitter(
-            loss,
-            initial_params=params_from_vec(x0),
-            bounds=dict.fromkeys(KEYS, BOX),
-        )
-        opt = fitter.fit_anneal(
-            budget=budget,
-            replicas=2,
-            seed=3,
-            history="shared",
-            jac=jac,
-        )
-        best = pair_energy(vec_from_params(opt))
+        dump_path = campaign / f"{name}.min"
+        print("start", name, start_e, "dump", dump_path)
+        with dump_path.open("w", encoding="ascii") as dump_fh:
+            _AskDump.fh = dump_fh
+            fitter = Fitter(
+                loss,
+                initial_params=params_from_vec(x0),
+                bounds=dict.fromkeys(KEYS, BOX),
+            )
+            opt = fitter.fit_anneal(
+                budget=budget,
+                replicas=2,
+                seed=3,
+                history="shared",
+                jac=jac,
+            )
+            _AskDump.fh = None
+        best_x = vec_from_params(opt)
+        best = pair_energy(best_x)
         n_evals = int(fitter.contexts[0].n_evals)
         ctx_best = fitter.contexts[0].opt_loss
         hit = best < CAMBRIDGE_GM + 1e-3
         hit_any = hit_any or hit
+        if hit and gm_x is None:
+            gm_x = best_x
+            gm_e = best
+        dump_lines = sum(1 for line in dump_path.read_text().splitlines() if line.strip())
         print(
             "result",
             name,
@@ -141,6 +167,8 @@ def main() -> int:
             n_evals,
             "ctx_best",
             ctx_best,
+            "dump_lines",
+            dump_lines,
         )
         rows.append(
             {
@@ -149,12 +177,12 @@ def main() -> int:
                 "best_energy": best,
                 "n_evals": n_evals,
                 "ctx_best": ctx_best,
+                "dump_lines": dump_lines,
                 "hit": hit,
             }
         )
-
-    campaign = Path("lj13-cartesian")
-    campaign.mkdir(exist_ok=True)
+    if gm_x is not None and gm_e is not None:
+        write_min_line(campaign / "ref.min", gm_e, gm_x)
     (campaign / "opt.json").write_text(
         json.dumps(
             {
