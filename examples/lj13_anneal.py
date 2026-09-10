@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Fit LJ epsilon/sigma on a 4-atom tetrahedron through ChemFit.fit_anneal.
+Fit LJ epsilon/sigma on Mackay LJ13 through ChemFit.fit_anneal.
 
-Eight regular tetrahedra (Ar4, edge lengths around the LJ minimum). The
-state is the two parameters, not a 3N geometry. replicas and store are
-set on the Fitter call.
+Eight scaled icosahedra (Ar13, centre plus twelve vertices). The state is
+the two parameters, not a 3N geometry. replicas and store are set on the
+Fitter call.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tests"))
-from conftest import LJTetraFactory, apply_params_lj, construct_lj, e_lj_tetra
+from conftest import LJ13IcoFactory, apply_params_lj, construct_lj, e_lj_pairs
 
 from chemfit.abstract_objective_function import (
     EvaluateContext,
@@ -31,17 +31,18 @@ def loss_function(quants: dict, e_ref: float):
     return (quants["energy"] - e_ref) ** 2
 
 
-def lj_tetra_term(
-    r: float, eps: float, sigma: float
-) -> QuantityComputerObjectiveFunction:
+def lj13_term(r: float, eps: float, sigma: float) -> QuantityComputerObjectiveFunction:
+    factory = LJ13IcoFactory(r)
     computer = SinglePointASEComputer(
         calc_factory=construct_lj,
         param_applier=apply_params_lj,
-        atoms_factory=LJTetraFactory(r),
-        tag=f"lj4_{r}",
+        atoms_factory=factory,
+        tag=f"lj13_{r}",
     )
     return QuantityComputerObjectiveFunction(
-        loss_function=functools.partial(loss_function, e_ref=e_lj_tetra(r, eps, sigma)),
+        loss_function=functools.partial(
+            loss_function, e_ref=e_lj_pairs(factory.positions, eps, sigma)
+        ),
         quantity_computer=computer,
     )
 
@@ -57,30 +58,26 @@ def main() -> int:
     start = {"epsilon": 2.0, "sigma": 1.5}
     r_min = 2.0 ** (1.0 / 6.0) * sigma0
     r_list = np.linspace(0.95 * r_min, 2.0 * sigma0, 8)
-    atoms = LJTetraFactory(float(r_list[0]))()
-    print("n_atoms", len(atoms), "n_edges", 6, "n_sizes", len(r_list))
+    factory0 = LJ13IcoFactory(float(r_list[0]))
+    atoms = factory0()
+    n_pairs = len(atoms) * (len(atoms) - 1) // 2
+    print("n_atoms", len(atoms), "n_pairs", n_pairs, "n_sizes", len(r_list))
     computer = SinglePointASEComputer(
         calc_factory=construct_lj,
         param_applier=apply_params_lj,
-        atoms_factory=LJTetraFactory(float(r_list[0])),
-        tag="lj4_preflight",
+        atoms_factory=LJ13IcoFactory(float(r_list[0])),
+        tag="lj13_preflight",
     )
     quants = computer({"epsilon": eps0, "sigma": sigma0}, EvaluateContext())
     if "energy" not in quants:
         print("preflight missing energy", sorted(quants), file=sys.stderr)
         return 3
-    print(
-        "preflight_energy",
-        quants["energy"],
-        "analytic",
-        e_lj_tetra(float(r_list[0]), eps0, sigma0),
-    )
-    ob = CombinedObjectiveFunction(
-        [lj_tetra_term(float(r), eps0, sigma0) for r in r_list]
-    )
+    analytic = e_lj_pairs(factory0.positions, eps0, sigma0)
+    print("preflight_energy", quants["energy"], "analytic", analytic)
+    ob = CombinedObjectiveFunction([lj13_term(float(r), eps0, sigma0) for r in r_list])
     start_loss = float(ob(start))
     print("start", start, "start_loss", start_loss)
-    campaign = Path("lj4-campaign")
+    campaign = Path("lj13-campaign")
     campaign.mkdir(exist_ok=True)
     fitter = Fitter(
         ob,
@@ -100,7 +97,7 @@ def main() -> int:
     print("store", campaign / "params.jsonl")
     moved = end_loss < start_loss
     recovered = abs(opt["epsilon"] - eps0) < 0.25 and abs(opt["sigma"] - sigma0) < 0.25
-    print("LJ4_ANNEAL_OK" if moved and recovered else "LJ4_ANNEAL_MISS")
+    print("LJ13_ANNEAL_OK" if moved and recovered else "LJ13_ANNEAL_MISS")
     return 0 if moved and recovered else 1
 
 

@@ -1,4 +1,4 @@
-"""fit_anneal on the ChemFit LJ dimer curve and a 4-atom tetrahedron."""
+"""fit_anneal on the ChemFit LJ dimer curve and a Mackay LJ13 icosahedron."""
 
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ import pytest
 anneal = pytest.importorskip("anneal")
 
 from conftest import (
+    LJ13IcoFactory,
     LJAtomsFactory,
-    LJTetraFactory,
     apply_params_lj,
     construct_lj,
     e_lj,
-    e_lj_tetra,
+    e_lj_pairs,
 )
 
 from chemfit.abstract_objective_function import (
@@ -44,17 +44,18 @@ def lj_ob_term(r: float, eps: float, sigma: float) -> QuantityComputerObjectiveF
     )
 
 
-def lj_tetra_term(
-    r: float, eps: float, sigma: float
-) -> QuantityComputerObjectiveFunction:
+def lj13_term(r: float, eps: float, sigma: float) -> QuantityComputerObjectiveFunction:
+    factory = LJ13IcoFactory(r)
     computer = SinglePointASEComputer(
         calc_factory=construct_lj,
         param_applier=apply_params_lj,
-        atoms_factory=LJTetraFactory(r),
-        tag=f"lj4_{r}",
+        atoms_factory=factory,
+        tag=f"lj13_{r}",
     )
     return QuantityComputerObjectiveFunction(
-        loss_function=functools.partial(loss_function, e_ref=e_lj_tetra(r, eps, sigma)),
+        loss_function=functools.partial(
+            loss_function, e_ref=e_lj_pairs(factory.positions, eps, sigma)
+        ),
         quantity_computer=computer,
     )
 
@@ -65,21 +66,21 @@ def test_fit_anneal_needs_finite_bounds():
         fitter.fit_anneal(budget=16, replicas=2)
 
 
-def test_lj4_tetra_computer_returns_energy():
+def test_lj13_computer_returns_energy():
     r = 2.0 ** (1.0 / 6.0)
-    atoms = LJTetraFactory(r)()
-    assert len(atoms) == 4
+    atoms = LJ13IcoFactory(r)()
+    assert len(atoms) == 13
     computer = SinglePointASEComputer(
         calc_factory=construct_lj,
         param_applier=apply_params_lj,
-        atoms_factory=LJTetraFactory(r),
-        tag="lj4_energy",
+        atoms_factory=LJ13IcoFactory(r),
+        tag="lj13_energy",
     )
     quants = computer({"epsilon": 1.0, "sigma": 1.0}, EvaluateContext())
     assert "energy" in quants
-    assert quants["energy"] == pytest.approx(
-        e_lj_tetra(r, 1.0, 1.0), rel=1e-6, abs=1e-6
-    )
+    assert quants["n_atoms"] == 13
+    analytic = e_lj_pairs(LJ13IcoFactory(r).positions, 1.0, 1.0)
+    assert quants["energy"] == pytest.approx(analytic, rel=1e-6, abs=1e-6)
 
 
 def test_fit_anneal_lj_dimers(tmp_path):
@@ -105,17 +106,17 @@ def test_fit_anneal_lj_dimers(tmp_path):
     assert opt["sigma"] == pytest.approx(sigma, rel=0.25, abs=0.25)
 
 
-def test_fit_anneal_lj4_tetrahedron(tmp_path):
+def test_fit_anneal_lj13_icosahedron(tmp_path):
     eps, sigma = 1.0, 1.0
     r_min = 2.0 ** (1.0 / 6.0) * sigma
     r_list = np.linspace(0.95 * r_min, 2.0 * sigma, 8)
-    ob = CombinedObjectiveFunction([lj_tetra_term(r, eps, sigma) for r in r_list])
+    ob = CombinedObjectiveFunction([lj13_term(float(r), eps, sigma) for r in r_list])
     fitter = Fitter(
         ob,
         initial_params={"epsilon": 2.0, "sigma": 1.5},
         bounds={"epsilon": (0.2, 4.0), "sigma": (0.2, 4.0)},
     )
-    store = tmp_path / "lj4_tetra.jsonl"
+    store = tmp_path / "lj13_ico.jsonl"
     start_loss = float(ob({"epsilon": 2.0, "sigma": 1.5}))
     opt = fitter.fit_anneal(
         budget=240,
